@@ -1,0 +1,111 @@
+<!-- templates/chat.html -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gemini Chatbox</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100">
+  <div id="root" class="min-h-screen flex items-center justify-center p-4"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    function ChatApp() {
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState("");
+      const [loading, setLoading] = useState(false);
+      const endRef = useRef(null);
+
+      useEffect(() => {
+        endRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [messages]);
+
+      const send = async () => {
+        const text = input.trim();
+        if (!text) return;
+        setMessages(m => [...m, { who: "user", text }]);
+        setInput("");
+        setLoading(true);
+
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text })
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            const errMsg = data?.error || JSON.stringify(data);
+            setMessages(m => [...m, { who: "bot", text: `Lỗi từ server: ${errMsg}` }]);
+          } else {
+            setMessages(m => [...m, { who: "bot", text: data.reply }]);
+          }
+        } catch (err) {
+          setMessages(m => [...m, { who: "bot", text: "Không kết nối được tới server." }]);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const onKey = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          send();
+        }
+      };
+
+      return (
+        <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-4 border border-purple-200">
+          <h1 className="text-center text-3xl font-extrabold mb-4 bg-gradient-to-r from-indigo-500 to-pink-500 text-transparent bg-clip-text">
+            💬 Gemini Chatbox
+          </h1>
+
+          <div className="border rounded-xl p-3 h-[60vh] overflow-y-auto mb-4 bg-gradient-to-b from-white to-gray-50 shadow-inner">
+            {messages.length === 0 && (
+              <div className="text-center text-gray-400 italic">Bắt đầu bằng cách nhập tin nhắn ở dưới</div>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} className={`my-2 flex ${m.who === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`${m.who === "user" 
+                  ? "bg-indigo-500 text-white" 
+                  : "bg-purple-200 text-gray-900"} px-4 py-2 rounded-2xl shadow-md max-w-[80%] whitespace-pre-wrap`}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            <div ref={endRef} />
+          </div>
+
+          <div className="flex gap-2">
+            <textarea
+              rows="1"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={onKey}
+              placeholder="Nhập tin nhắn... (Enter gửi, Shift+Enter xuống dòng)"
+              className="flex-1 border rounded-xl p-2 resize-none focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+              disabled={loading}
+            />
+            <button 
+              onClick={send} 
+              className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-5 py-2 rounded-xl font-semibold shadow hover:scale-105 transition disabled:opacity-60" 
+              disabled={loading}
+            >
+              {loading ? "Đang gửi..." : "Gửi"}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<ChatApp />);
+  </script>
+</body>
+</html>
